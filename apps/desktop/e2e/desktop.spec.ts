@@ -1600,20 +1600,36 @@ test('@package-smoke 创作模块连接内嵌 Runtime 并使用默认项目', as
 });
 
 test('@package-smoke 字幕 Worker 和 WASM 在实际 App 的 CSP 下加载并渲染', async ({}, testInfo) => {
+  test.setTimeout(180_000);
   const fixture = await launchPackagedDesktop('success', { runtimeMode: 'bundled' });
   const loaded: string[] = [];
   const errors: string[] = [];
   const consoleErrors: string[] = [];
   const failedRequests: string[] = [];
   const requested: string[] = [];
+  const failedResponses: Array<{ url: string; status: number }> = [];
   const timings: Record<string, number> = {};
   fixture.page.on('request', request => requested.push(request.url()));
-  fixture.page.on('response', response => loaded.push(response.url()));
+  fixture.page.on('response', response => {
+    loaded.push(response.url());
+    if (response.status() >= 400) failedResponses.push({ url: response.url(), status: response.status() });
+  });
   fixture.page.on('pageerror', error => errors.push(error.message));
   fixture.page.on('console', message => { if (message.type() === 'error') consoleErrors.push(message.text()); });
   fixture.page.on('requestfailed', request => failedRequests.push(`${request.url()}: ${request.failure()?.errorText}`));
   try {
     await waitForWorkspace(fixture.page);
+    // A fresh profile hashes the complete bundled Runtime in the background.
+    // Its cache is written only after every resource has passed verification.
+    const verificationStartedAt = Date.now();
+    const verificationCache = join(fixture.root, '.opencreator', 'data', 'runtime-verification', 'krillinai.json');
+    await expect.poll(() => existsSync(verificationCache), {
+      message: 'Bundled Creator Runtime integrity verification must complete before subtitle compilation',
+      timeout: 120_000,
+      intervals: [100, 250, 500, 1_000]
+    }).toBe(true);
+    timings.runtimeVerificationMs = Date.now() - verificationStartedAt;
+    expect(JSON.parse(readFileSync(verificationCache, 'utf8')).files.length).toBeGreaterThan(0);
     await fixture.page.setViewportSize({ width: 1440, height: 900 });
     const projects = await runtimeRequest<{ projects: Array<{ id: string }> }>(fixture.page, 'GET', '/projects?status=all');
     const created = await runtimeRequest<{ job: { id: string } }>(fixture.page, 'POST', '/creator/jobs', {
@@ -1643,7 +1659,7 @@ test('@package-smoke 字幕 Worker 和 WASM 在实际 App 的 CSP 下加载并�
         artifactRefs: { source_video: [sourceId], target_subtitle: [subtitleId] }, changedArtifactIds: [subtitleId], staleArtifactIds: [], state: { ...state } }];
       database.prepare('UPDATE creator_jobs SET status = ?, revision = revision + 1, state_json = ? WHERE id = ?').run('completed', JSON.stringify(state), jobId);
     } finally { database.close(); }
-    // 全新账号先校验完整 Runtime；单独等待编译完成后，再验收 Worker/WASM 的加载和渲染。
+    // Measure compilation separately from cold Runtime verification and rendering.
     const compilationStartedAt = Date.now();
     const compilation = fixture.page.waitForResponse(response => response.url().endsWith('/creator/subtitle-render/prepare'), { timeout: 60_000 });
     await navigateToAppRoute(fixture.page, `#/workbench?tool=video-translation&jobId=${created.body.job.id}`);
@@ -1663,8 +1679,10 @@ test('@package-smoke 字幕 Worker 和 WASM 在实际 App 的 CSP 下加载并�
   } finally {
     const subtitleResource = (url: string) => /\/subtitle-render\/|\/assets\/(?:subtitle-renderer|worker-)|\.wasm$/.test(url);
     await testInfo.attach('subtitle-renderer-diagnostics.json', {
-      body: JSON.stringify({ timings, loaded: loaded.filter(subtitleResource), requested: requested.filter(subtitleResource), errors, consoleErrors, failedRequests }, null, 2), contentType: 'application/json'
+      body: JSON.stringify({ timings, loaded: loaded.filter(subtitleResource), requested: requested.filter(subtitleResource), errors, consoleErrors, failedRequests, failedResponses }, null, 2), contentType: 'application/json'
     });
+    const desktopLog = join(fixture.root, '.opencreator', 'logs', 'desktop-main.log');
+    if (existsSync(desktopLog)) await testInfo.attach('subtitle-desktop-main.log', { path: desktopLog, contentType: 'text/plain' });
     await closeFixture(fixture);
   }
 });
