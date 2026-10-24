@@ -56,7 +56,7 @@ jobs:
           echo "Release-only change: $release_only"
 
   release-checks:
-    if: needs.classify.outputs.release-only == 'true'
+    if: needs.classify.outputs.release-only == 'true' && github.event_name != 'push'
     needs: classify
     runs-on: ubuntu-latest
     timeout-minutes: 10
