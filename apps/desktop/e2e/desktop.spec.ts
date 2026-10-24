@@ -1603,8 +1603,15 @@ test('@package-smoke 字幕 Worker 和 WASM 在实际 App 的 CSP 下加载并�
   const fixture = await launchPackagedDesktop('success', { runtimeMode: 'bundled' });
   const loaded: string[] = [];
   const errors: string[] = [];
+  const consoleErrors: string[] = [];
+  const failedRequests: string[] = [];
+  const requested: string[] = [];
+  const timings: Record<string, number> = {};
+  fixture.page.on('request', request => requested.push(request.url()));
   fixture.page.on('response', response => loaded.push(response.url()));
   fixture.page.on('pageerror', error => errors.push(error.message));
+  fixture.page.on('console', message => { if (message.type() === 'error') consoleErrors.push(message.text()); });
+  fixture.page.on('requestfailed', request => failedRequests.push(`${request.url()}: ${request.failure()?.errorText}`));
   try {
     await waitForWorkspace(fixture.page);
     await fixture.page.setViewportSize({ width: 1440, height: 900 });
@@ -1636,9 +1643,16 @@ test('@package-smoke 字幕 Worker 和 WASM 在实际 App 的 CSP 下加载并�
         artifactRefs: { source_video: [sourceId], target_subtitle: [subtitleId] }, changedArtifactIds: [subtitleId], staleArtifactIds: [], state: { ...state } }];
       database.prepare('UPDATE creator_jobs SET status = ?, revision = revision + 1, state_json = ? WHERE id = ?').run('completed', JSON.stringify(state), jobId);
     } finally { database.close(); }
+    // 全新账号先校验完整 Runtime；单独等待编译完成后，再验收 Worker/WASM 的加载和渲染。
+    const compilationStartedAt = Date.now();
+    const compilation = fixture.page.waitForResponse(response => response.url().endsWith('/creator/subtitle-render/prepare'), { timeout: 60_000 });
     await navigateToAppRoute(fixture.page, `#/workbench?tool=video-translation&jobId=${created.body.job.id}`);
+    expect((await compilation).status()).toBe(200);
+    timings.compilationMs = Date.now() - compilationStartedAt;
+    const renderingStartedAt = Date.now();
     const composition = fixture.page.locator('.subtitle-composition-preview');
     await expect(composition).toHaveAttribute('data-status', 'ready');
+    timings.renderingMs = Date.now() - renderingStartedAt;
     await expect(composition.locator('canvas')).toBeVisible();
     expect(loaded.some(url => url.includes('/subtitle-render/fonts/'))).toBe(true);
     expect(loaded.some(url => /\/assets\/worker-.*\.js$/.test(url))).toBe(true);
@@ -1646,7 +1660,13 @@ test('@package-smoke 字幕 Worker 和 WASM 在实际 App 的 CSP 下加载并�
     expect(errors).toEqual([]);
     await fixture.page.waitForTimeout(300);
     await composition.screenshot({ path: testInfo.outputPath('packaged-subtitle-preview.png') });
-  } finally { await closeFixture(fixture); }
+  } finally {
+    const subtitleResource = (url: string) => /\/subtitle-render\/|\/assets\/(?:subtitle-renderer|worker-)|\.wasm$/.test(url);
+    await testInfo.attach('subtitle-renderer-diagnostics.json', {
+      body: JSON.stringify({ timings, loaded: loaded.filter(subtitleResource), requested: requested.filter(subtitleResource), errors, consoleErrors, failedRequests }, null, 2), contentType: 'application/json'
+    });
+    await closeFixture(fixture);
+  }
 });
 
 test('@package-smoke Windows YouTube 专用登录完成和取消，保存后重启复用', async ({}, testInfo) => {
