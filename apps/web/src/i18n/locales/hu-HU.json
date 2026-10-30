@@ -3339,5 +3339,9 @@
   "Doubao TTS 2.0 uses an API key. Legacy small models use an App ID and Access Token. Pick an official voice or enter a cloned Speaker ID starting with S_.": "A Doubao TTS 2.0 API-kulcsot használ. A régebbi kis modellek alkalmazásazonosítót és hozzáférési tokent használnak. Válasszon egy hivatalos hangot, vagy írjon be egy klónozott hangszóróazonosítót, amely S_ karakterrel kezdődik.",
   "Use legacy credentials": "Régebbi hitelesítő adatok használata",
   "Off uses the newer-console single API Key (X-Api-Key). On switches to the legacy console App ID and Access Token pair.": "Kikapcsolva az új konzol egyetlen API-kulcsát (X-Api-Key) használja. Bekapcsolva a régi konzol alkalmazásazonosítójára és hozzáférési tokenjére vált.",
-  "Legacy mode only takes effect once an App ID is set; while it is empty the credential is still sent as a newer-console API Key via X-Api-Key.": "A régi mód csak akkor lép életbe, ha van alkalmazásazonosító; amíg üres, a hitelesítő adatok továbbra is az új konzol API-kulcsaként, X-Api-Key-en keresztül küldésre kerülnek."
+  "Legacy mode only takes effect once an App ID is set; while it is empty the credential is still sent as a newer-console API Key via X-Api-Key.": "A régi mód csak akkor lép életbe, ha van alkalmazásazonosító; amíg üres, a hitelesítő adatok továbbra is az új konzol API-kulcsaként, X-Api-Key-en keresztül küldésre kerülnek.",
+  "Subtitle preview progress": "Feliratelőnézet állapota",
+  "Adjust timing": "Időzítés módosítása",
+  "Enter the required credentials for the selected dubbing service to continue.": "A folytatáshoz adja meg a kiválasztott szinkronizálási szolgáltatás szükséges hitelesítő adatait.",
+  "Save and continue composing": "Mentés és a videó összeállításának folytatása"
 }

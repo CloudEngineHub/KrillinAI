@@ -3339,5 +3339,9 @@
   "Doubao TTS 2.0 uses an API key. Legacy small models use an App ID and Access Token. Pick an official voice or enter a cloned Speaker ID starting with S_.": "Doubao TTS 2.0 ایک API کی استعمال کرتا ہے۔ پرانے چھوٹے ماڈل کی آوازیں ایپ آئی ڈی اور ایکسیس ٹوکن استعمال کرتی ہیں۔ ایک آفیشل آواز چنیں یا S_ سے شروع ہونے والی کلون شدہ اسپیکر ID درج کریں۔",
   "Use legacy credentials": "پرانی سندیں استعمال کریں",
   "Off uses the newer-console single API Key (X-Api-Key). On switches to the legacy console App ID and Access Token pair.": "بند ہونے پر نئے کنسول کی ایک API کی (X-Api-Key) استعمال ہوتی ہے۔ کھلے ہونے پر پرانے کنسول کے ایپ آئی ڈی اور ایکسیس ٹوکن کی جوڑی پر تبدیل ہو جاتا ہے۔",
-  "Legacy mode only takes effect once an App ID is set; while it is empty the credential is still sent as a newer-console API Key via X-Api-Key.": "پرانا موڈ صرف ایپ آئی ڈی کے مقرر ہونے کے بعد لاگو ہوتا ہے؛ جب تک وہ خالی ہے، سندیں X-Api-Key کے ذریعے نئے کنسول کی API کی کے طور پر بھیجی جاتی ہیں۔"
+  "Legacy mode only takes effect once an App ID is set; while it is empty the credential is still sent as a newer-console API Key via X-Api-Key.": "پرانا موڈ صرف ایپ آئی ڈی کے مقرر ہونے کے بعد لاگو ہوتا ہے؛ جب تک وہ خالی ہے، سندیں X-Api-Key کے ذریعے نئے کنسول کی API کی کے طور پر بھیجی جاتی ہیں۔",
+  "Subtitle preview progress": "سب ٹائٹل پیش نظارے کی پیش رفت",
+  "Adjust timing": "وقت ایڈجسٹ کریں",
+  "Enter the required credentials for the selected dubbing service to continue.": "جاری رکھنے کے لیے منتخب ڈبنگ سروس کی مطلوبہ اسناد درج کریں۔",
+  "Save and continue composing": "محفوظ کریں اور ویڈیو بنانا جاری رکھیں"
 }

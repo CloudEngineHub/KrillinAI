@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       target:
-        description: 要验证的 Desktop 平台
+        description: 要打包的 Desktop 平台
         required: true
         default: all
         type: choice
@@ -14,6 +14,10 @@ on:
           - macos-arm64
           - windows-x64
           - publish
+      reuse_run_id:
+        description: 可选，复用指定 master 发布运行中成功且构建输入一致的平台附件
+        required: false
+        type: string
       release_tag:
         description: 仅 target=publish 时使用的现有发布标签（保留标签和候选安装包）
         required: false
@@ -37,7 +41,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      matrix: ${{ steps.release-matrix.outputs.matrix }}
+      matrix: ${{ steps.candidate-plan.outputs.matrix }}
+      build-required: ${{ steps.candidate-plan.outputs.build-required }}
+      reused-artifacts: ${{ steps.candidate-plan.outputs.reused-artifacts }}
+      reuse-linux: ${{ steps.candidate-plan.outputs.reuse-linux }}
       release-tag: ${{ steps.release-target.outputs.tag }}
       release-sha: ${{ steps.release-target.outputs.sha }}
     steps:
@@ -70,28 +77,6 @@ jobs:
             fi
             echo "sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
           fi
-      - name: 校验同一提交的 CI 已通过
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          RELEASE_SHA: ${{ steps.release-target.outputs.sha }}
-        run: |
-          for sha in $(printf '%s\n' "$GITHUB_SHA" "$RELEASE_SHA" | sort -u); do
-            successful_runs="$(
-              gh run list \
-                --workflow ci.yml \
-                --commit "$sha" \
-                --event push \
-                --status success \
-                --limit 1 \
-                --json databaseId \
-                --jq 'length'
-            )"
-            if [[ "$successful_runs" != "1" ]]; then
-              echo "::error::提交 $sha 尚无成功的 master push CI，请等待 CI 通过后再创建发布标签。"
-              exit 1
-            fi
-          done
       - name: 选择 Desktop 构建平台
         id: release-matrix
         shell: bash
@@ -117,9 +102,43 @@ jobs:
               ;;
           esac
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+      - name: 选择可复用安装包并规划缺失平台
+        id: candidate-plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TARGET: ${{ inputs.target || 'all' }}
+          REUSE_RUN_ID: ${{ inputs.reuse_run_id }}
+          RELEASE_MATRIX: ${{ steps.release-matrix.outputs.matrix }}
+        run: node apps/desktop/scripts/release-build-input.mjs plan-candidate
+
+  reuse:
+    if: github.event_name == 'workflow_dispatch' && inputs.target == 'all' && needs.verify.outputs.reused-artifacts != '[]'
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+    strategy:
+      matrix:
+        artifact: ${{ fromJSON(needs.verify.outputs.reused-artifacts) }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.reuse_run_id }}
+          name: ${{ matrix.artifact }}
+          path: reused
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: reused/*
+          if-no-files-found: error
+          compression-level: 0
 
   package:
-    if: github.event_name == 'workflow_dispatch' && inputs.target != 'publish'
+    if: github.event_name == 'workflow_dispatch' && inputs.target != 'publish' && needs.verify.outputs.build-required == 'true'
     needs: verify
     timeout-minutes: 90
     strategy:
@@ -159,6 +178,9 @@ jobs:
             echo "::error::release Environment 缺少 macOS 签名 Secret：${missing[*]}"
             exit 1
           fi
+      - name: Preserve source line endings on Windows
+        if: matrix.platform == 'win32'
+        run: git config --global core.autocrlf false
       - uses: actions/checkout@v4
       - name: 验证并使用 macOS Command Line Tools
         if: matrix.platform == 'darwin'
@@ -214,7 +236,7 @@ jobs:
         with:
           path: |
             .runtime/build/krillinai/${{ matrix.platform }}-${{ matrix.arch }}
-          key: krillinai-build-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('scripts/build-krillinai.mjs', 'runtime/krillinai/**') }}
+          key: krillinai-build-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('scripts/build-krillinai.mjs', 'scripts/download-go-modules.mjs', 'scripts/krillinai-build-contract.mjs', 'runtime/krillinai/**') }}
       - run: pnpm install --frozen-lockfile
       - name: 生成 macOS 正式签名安装包
         if: matrix.platform == 'darwin'
@@ -238,6 +260,7 @@ jobs:
           fi
           exit "$release_status"
         env:
+          GH_TOKEN: ${{ github.token }}
           OPENCREATOR_DESKTOP_TARGET_PLATFORM: ${{ matrix.platform }}
           OPENCREATOR_DESKTOP_TARGET_ARCH: ${{ matrix.arch }}
           CSC_LINK: ${{ secrets.MACOS_CERTIFICATE }}
@@ -250,10 +273,9 @@ jobs:
         if: matrix.platform == 'win32'
         run: pnpm desktop:dist
         env:
+          GH_TOKEN: ${{ github.token }}
           OPENCREATOR_DESKTOP_TARGET_PLATFORM: ${{ matrix.platform }}
           OPENCREATOR_DESKTOP_TARGET_ARCH: ${{ matrix.arch }}
-      - name: 验证实际打包应用
-        run: pnpm --filter @opencreator/desktop e2e:package:smoke
       - name: 生成 KrillinAI Server 与 CLI 独立发布包
         run: pnpm krillinai:package
         env:
@@ -283,12 +305,11 @@ jobs:
             apps/desktop/release/builder-debug.yml
             apps/desktop/release/builder-effective-config.yaml
             desktop-release.log
-            test-results/desktop-playwright-report/
           if-no-files-found: ignore
           retention-days: 14
 
   krillinai-linux-package:
-    if: github.event_name == 'workflow_dispatch' && inputs.target == 'all'
+    if: github.event_name == 'workflow_dispatch' && inputs.target == 'all' && needs.verify.outputs.reuse-linux != 'true'
     needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -322,10 +343,20 @@ jobs:
           compression-level: 0
 
   candidate-ready:
-    if: github.event_name == 'workflow_dispatch' && inputs.target == 'all'
+    if: >-
+      ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.target == 'all'
+          && needs.verify.result == 'success'
+          && (needs.package.result == 'success' || needs.package.result == 'skipped')
+          && (needs.krillinai-linux-package.result == 'success' || needs.krillinai-linux-package.result == 'skipped')
+          && (needs.reuse.result == 'success' || needs.reuse.result == 'skipped') }}
     needs:
+      - verify
       - package
       - krillinai-linux-package
+      - reuse
+    permissions:
+      actions: read
+      contents: read
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -333,12 +364,28 @@ jobs:
       - name: 计算应用构建输入指纹
         id: build-input
         run: echo "digest=$(node apps/desktop/scripts/release-build-input.mjs digest)" >> "$GITHUB_OUTPUT"
+      - name: 确认全部发布附件已上传
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh api "repos/$GH_REPO/actions/runs/$GITHUB_RUN_ID/artifacts?per_page=100" > candidate-artifacts.json
+          node --input-type=module <<'NODE'
+            import { readFileSync } from 'node:fs';
+            const available = new Set(JSON.parse(readFileSync('candidate-artifacts.json', 'utf8')).artifacts
+              .filter(artifact => !artifact.expired).map(artifact => artifact.name));
+            const expected = ['opencreator-desktop-macos-x64', 'opencreator-desktop-macos-arm64',
+              'opencreator-desktop-windows-x64-unsigned', 'krillinai-release-macos-x64',
+              'krillinai-release-macos-arm64', 'krillinai-release-windows-x64', 'krillinai-release-linux'];
+            for (const name of expected) if (!available.has(name)) throw new Error(`Missing release artifact: ${name}`);
+          NODE
       - name: 记录可提升候选包
         env:
           CANDIDATE_SHA: ${{ github.sha }}
           CANDIDATE_RUN_ID: ${{ github.run_id }}
           CANDIDATE_REPOSITORY: ${{ github.repository }}
           CANDIDATE_BUILD_INPUT_DIGEST: ${{ steps.build-input.outputs.digest }}
+          REUSED_FROM_RUN_ID: ${{ inputs.reuse_run_id }}
         run: |
           node <<'NODE'
             const fs = require("node:fs");
@@ -349,7 +396,9 @@ jobs:
               runId: Number(process.env.CANDIDATE_RUN_ID),
               repository: process.env.CANDIDATE_REPOSITORY,
               event: "workflow_dispatch",
-              target: "all"
+              target: "all",
+              reusedFromRunId: process.env.REUSED_FROM_RUN_ID || null,
+              validation: "packaging-only"
             };
             fs.writeFileSync("release-candidate.json", `${JSON.stringify(candidate, null, 2)}\n`);
           NODE

@@ -3339,5 +3339,9 @@
   "Doubao TTS 2.0 uses an API key. Legacy small models use an App ID and Access Token. Pick an official voice or enter a cloned Speaker ID starting with S_.": "Doubao TTS 2.0 використовує ключ API. Старі невеликі моделі використовують ідентифікатор програми та маркер доступу. Виберіть офіційний голос або введіть клонований ідентифікатор мовця, який починається з S_.",
   "Use legacy credentials": "Використовувати старі дані для входу",
   "Off uses the newer-console single API Key (X-Api-Key). On switches to the legacy console App ID and Access Token pair.": "У вимкненому стані використовується єдиний ключ API (X-Api-Key) нової консолі. В увімкненому — пара ідентифікатора програми та маркера доступу старої консолі.",
-  "Legacy mode only takes effect once an App ID is set; while it is empty the credential is still sent as a newer-console API Key via X-Api-Key.": "Старий режим діє лише після встановлення ідентифікатора програми; поки він порожній, дані для входу все ще надсилаються як ключ API нової консолі через X-Api-Key."
+  "Legacy mode only takes effect once an App ID is set; while it is empty the credential is still sent as a newer-console API Key via X-Api-Key.": "Старий режим діє лише після встановлення ідентифікатора програми; поки він порожній, дані для входу все ще надсилаються як ключ API нової консолі через X-Api-Key.",
+  "Subtitle preview progress": "Перебіг попереднього перегляду субтитрів",
+  "Adjust timing": "Налаштувати час",
+  "Enter the required credentials for the selected dubbing service to continue.": "Щоб продовжити, введіть необхідні облікові дані вибраного сервісу озвучування.",
+  "Save and continue composing": "Зберегти та продовжити збирання відео"
 }

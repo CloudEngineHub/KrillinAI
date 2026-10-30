@@ -3339,5 +3339,9 @@
   "Doubao TTS 2.0 uses an API key. Legacy small models use an App ID and Access Token. Pick an official voice or enter a cloned Speaker ID starting with S_.": "Doubao TTS 2.0 memakai API Key. Model kecil lama memakai App ID dan Access Token. Pilih suara resmi atau masukkan ID pembicara kloning yang diawali S_.",
   "Use legacy credentials": "Gunakan kredensial lama",
   "Off uses the newer-console single API Key (X-Api-Key). On switches to the legacy console App ID and Access Token pair.": "Nonaktif memakai API Key tunggal (X-Api-Key) dari konsol baru. Aktif beralih ke pasangan App ID dan Access Token dari konsol lama.",
-  "Legacy mode only takes effect once an App ID is set; while it is empty the credential is still sent as a newer-console API Key via X-Api-Key.": "Mode lama baru berlaku setelah App ID diisi; selama masih kosong, kredensial tetap dikirim sebagai API Key konsol baru lewat X-Api-Key."
+  "Legacy mode only takes effect once an App ID is set; while it is empty the credential is still sent as a newer-console API Key via X-Api-Key.": "Mode lama baru berlaku setelah App ID diisi; selama masih kosong, kredensial tetap dikirim sebagai API Key konsol baru lewat X-Api-Key.",
+  "Subtitle preview progress": "Progres pratinjau subtitel",
+  "Adjust timing": "Sesuaikan waktu",
+  "Enter the required credentials for the selected dubbing service to continue.": "Masukkan kredensial yang diperlukan untuk layanan sulih suara yang dipilih untuk melanjutkan.",
+  "Save and continue composing": "Simpan dan lanjutkan penyusunan video"
 }
